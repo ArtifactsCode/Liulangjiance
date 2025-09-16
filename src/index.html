@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SNMP流量监测平台</title>
+  <!-- Tailwind CSS v3 -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome -->
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+  <!-- 统一的 Tailwind 配置 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#0A1A35',
+            secondary: '#1A5FEF',
+            accent: '#FFD700',
+            success: '#4CAF50',
+            warning: '#FFC107',
+            danger: '#FF5252',
+            info: '#2196F3',
+            dark: '#0A1A35',
+            light: '#F5F7FA'
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+          boxShadow: {
+            'card': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+            'card-hover': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+          },
+          animation: {
+            'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+          }
+        }
+      }
+    }
+  </script>
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      .bg-gradient-dark {
+        background: linear-gradient(135deg, #0A1A35 0%, #0F2A5A 100%);
+      }
+      .text-shadow {
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .card-border {
+        border: 1px solid rgba(26, 95, 239, 0.2);
+      }
+      .card-glow {
+        box-shadow: 0 0 15px rgba(26, 95, 239, 0.3);
+      }
+      .scrollbar-thin {
+        scrollbar-width: thin;
+      }
+      .scrollbar-thin::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+      }
+      .scrollbar-thin::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.1);
+      }
+      .scrollbar-thin::-webkit-scrollbar-thumb {
+        background: rgba(26, 95, 239, 0.5);
+        border-radius: 2px;
+      }
+    }
+  </style>
+</head>
+<body class="bg-primary text-white min-h-screen">
+  <!-- 背景图层 -->
+  <div class="fixed inset-0 z-0 opacity-20">
+    <img src="https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/fa29434b72ae4af0a4f6eccf94de8ac3~tplv-a9rns2rl98-image.image?rcl=20250915192738D78DC92DE1FF451409F2&rk3s=8e244e95&rrcfp=f06b921b&x-expires=1760527717&x-signature=RgTNsQR3ueTSfHrTyrcsiGnWFgE%3D" 
+         alt="背景" class="w-full h-full object-cover">
+  </div>
+
+  <!-- 主容器 -->
+  <div class="relative z-10">
+    <!-- 顶部导航栏 -->
+    <header class="bg-dark bg-opacity-80 backdrop-blur-md border-b border-secondary border-opacity-30 sticky top-0 z-50">
+      <div class="container mx-auto px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <i class="fa fa-line-chart text-accent text-2xl"></i>
+          <h1 class="text-xl font-bold text-white">SNMP流量监测平台</h1>
+        </div>
+        
+        <nav class="hidden md:flex space-x-6">
+          <a href="#" class="text-accent border-b-2 border-accent px-1 py-2 font-medium">首页</a>
+          <a href="#" class="text-gray-300 hover:text-accent px-1 py-2 transition-colors duration-200">设备监测</a>
+          <a href="#" class="text-gray-300 hover:text-accent px-1 py-2 transition-colors duration-200">网络监测</a>
+          <a href="#" class="text-gray-300 hover:text-accent px-1 py-2 transition-colors duration-200">流量统计</a>
+          <a href="#" class="text-gray-300 hover:text-accent px-1 py-2 transition-colors duration-200">告警中心</a>
+          <a href="#" class="text-gray-300 hover:text-accent px-1 py-2 transition-colors duration-200">配置管理</a>
+        </nav>
+        
+        <div class="flex items-center space-x-4">
+          <button class="bg-secondary hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors duration-200 flex items-center">
+            <i class="fa fa-refresh mr-1"></i> 刷新数据
+          </button>
+          <div class="relative">
+            <button class="text-gray-300 hover:text-white">
+              <i class="fa fa-bell text-lg"></i>
+              <span class="absolute -top-1 -right-1 bg-danger text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">3</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="container mx-auto px-4 py-6">
+      <!-- 筛选区 -->
+      <section class="mb-6 bg-dark bg-opacity-50 backdrop-blur-sm rounded-lg p-4 card-border">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div class="flex flex-wrap items-center gap-4">
+            <!-- 设备类型筛选 -->
+            <div class="flex items-center">
+              <label class="text-gray-300 mr-2">设备类型:</label>
+              <select class="bg-primary border border-secondary border-opacity-50 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent">
+                <option value="all">全部</option>
+                <option value="switch">交换机</option>
+                <option value="router">路由器</option>
+                <option value="firewall">防火墙</option>
+                <option value="server">服务器</option>
+              </select>
+            </div>
+            
+            <!-- IP地址范围筛选 -->
+            <div class="flex items-center">
+              <label class="text-gray-300 mr-2">IP地址范围:</label>
+              <input type="text" placeholder="192.168.1.0/24" class="bg-primary border border-secondary border-opacity-50 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent w-40">
+            </div>
+            
+            <!-- 时间范围筛选 -->
+            <div class="flex items-center">
+              <label class="text-gray-300 mr-2">时间范围:</label>
+              <select class="bg-primary border border-secondary border-opacity-50 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent">
+                <option value="today">今日</option>
+                <option value="yesterday">昨日</option>
+                <option value="week">本周</option>
+                <option value="month">本月</option>
+                <option value="custom">自定义</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="flex items-center">
+            <button class="bg-secondary hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200">
+              <i class="fa fa-search mr-1"></i> 查询
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 核心指标卡片 -->
+      <section class="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <!-- 总设备数 -->
+        <div class="bg-dark bg-opacity-50 backdrop-blur-sm rounded-lg p-4 card-border hover:card-glow transition-all duration-300">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-gray-300 text-sm">总设备数</h3>
+            <i class="fa fa-server text-secondary"></i>
+          </div>
+          <div class="flex items-end">
+            <span class="text-2xl font-bold">128</span>
+            <span class="text-xs text-gray-400 ml-1 mb-1">台</span>
+          </div>
+          <div class="mt-1 text-xs text-gray-400">较昨日 <span class="text-success">+2</span></div>
+        </div>
+        
+        <!-- 在线设备数 -->
+        <div class="bg-dark bg-opacity-50 backdrop-blur-sm rounded-lg p-4 card-border hover:card-glow transition-all duration-300">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-gray-300 text-sm">在线设备数</h3>
+            <i class="fa fa-check-circle text-success"></i>
+          </div>
+          <div class="flex items-end">
+            <span class="text-2xl font-bold">115</span>
+            <span class="text-xs text-gray-400 ml-1 mb-1">台</span>
+          </div>
+          <div class="mt-1 text-xs">
+            <span class="text-success">89.8%</span>
+            <span class="text-gray-400 ml-1">在线率</span>
+          </div>
+        </div>
+        
+        <!-- 总流量 -->
+        <div class="bg-dark bg-opacity-50 backdrop-blur-sm rounded-lg p-4 card-border hover:card-glow transition-all duration-300">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-gray-300 text-sm">总流量</h3>
+            <i class="fa fa-exchange text-info"></i>
+          </div>
+          <div class="flex items-end">
+            <span class="text-2xl font-bold">3.2</span>
+            <span class="text-xs text-gray-400 ml-1 mb-1">TB</span>
+          </div>
+          <div class="mt-1 text-xs text-gray-400">较昨日 <span class="text-danger">+12%</span></div>
+        </div>
+        
+        <!-- 平均带宽利用率 -->
+        <div class="bg-dark bg-opacity-50 backdrop-blur-sm rounded-lg p-4 card-border hover:card-glow transition-all duration-300">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-gray-300 text-sm">平均带宽利用率</h3>
+            <i class="fa fa-tachometer text-warning"></i>
+          </div>
+          <div class="flex items-end">
+            <span class="text-2xl font-bold">45.2</span>
+            <span class="text-xs text-gray-400 ml-1 mb-1">%</span>
+          </div>
+          <div class="mt-1 text-xs text-gray-400">较昨日 <span class="text-success">-3.5%</span></div>
+        </div>
+        
+        <!-- 异常设备数 -->
+        <div class="bg-dark bg-opacity-50 backdrop-blur-sm rounded-lg p-4 card-border hover:card-glow transition-all duration-300">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-gray-300 text-sm">异常设备数</h3>
+            <i class="fa fa-exclamation-triangle text-danger"></i>
+          </div>
+          <div class="flex items-end">
+            <span class="text-2xl font-bold">3</span>
+            <span class="text-xs text-gray-400 ml-1 mb-1">台</span>
+          </div>
+          <div class="mt-1 text-xs">
+            <span class="text-danger">2.3%</span>
+            <span class="text-gray-400 ml-1">异常率</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 主展示区 -->
+      <section class="mb-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- 左侧面板 -->
+        <div class="lg:col-span-1 space-y-6">
+          <!-- 设备状态环形图 -->
+          <div class="bg-dark bg-opacity-50 backdrop-blur-sm rounded-lg p-4 card-border">
+            <h3 class="text-gray-200 font-medium mb-4 flex items-center">
+              <i class="fa fa-circle-o-notch mr-2 text-secondary"></i>
+              设备状态分布
+            </h3>
+            <div class="flex items-center justify-center">
+              <canvas id="deviceStatusChart" height="200"></canvas>
+            </div>
+            <div class="grid grid-cols-3 gap-2 mt-4 text-center">
+              <div>
+                <div class="text-success font-medium">115</div>
+                <div class="text-xs text-gray-400">在线</div>
+              </div>
+              <div>
+                <div class="text-gray-400 font-medium">10</div>
+                <div class="text-xs text-gray-400">离线</div>
+              </div>
+              <div>
+                <div class="text-danger font-medium">3</div>
+                <div class="text-xs text-gray-400">异常</div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 流量协议占比饼图 -->
+          <div class="bg-dark bg-opacity-50 backdrop-blur-sm rounded-lg p-4 card-border">
+            <h3 class="text-gray-200 font-medium mb-4 flex items-center">
+              <i class="fa fa-pie-chart mr-2 text-secondary"></i>
+              流量协议占比
+            </h3>
+            <div class="flex items-center justify-center">
+              <canvas id="protocolChart" height="200"></canvas>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mt-4">
+              <div class="flex items-center">
+                <span class="w-3 h-3 rounded-full bg-blue-500 mr-2"></span>
+                <span class="text-sm">TCP: 68%</span>
+              </div>
+              <div class="flex items-center">
+                <span class="w-3 h-3 rounded-full bg-green-500 mr-2"></span>
+                <span class="text-sm">UDP: 22%</span>
+              </div>
+              <div class="flex items-center">
+                <span class="w-3 h-3 rounded-full bg-yellow-500 mr-2"></span>
+                <span class="text-sm">ICMP: 6%</span>
+              </div>
+              <div class="flex items-center">
+                <span class="w-3 h-3 rounded-full bg-gray-500 mr-2"></span>
+                <span class="text-sm">其他: 4%</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 设备类型分布条形图 -->
+          <div class="bg-dark bg-opacity-50 backdrop-blur-sm rounded-lg p-4 card-border">
+            <h3 class="text-gray-200 font-medium mb-4 flex items-center">
+              <i class="fa fa-bar-chart mr-2 text-secondary"></i>
+              设备类型分布
+            </h3>
+            <div class="flex items-center justify-center">
+              <canvas id="deviceTypeChart" height="200"></canvas>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 右侧面板 -->
+        <div class="lg:col-span-2 space-y-6">
+          <!-- 实时流量折线图 -->
+          <div class="bg-dark bg-opacity-50 backdrop-blur-sm rounded-lg p-4 card-border">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-gray-200 font-medium flex items-center">
+                <i class="fa fa-line-chart mr-2 text-secondary"></i>
+                实时流量趋势 (5分钟粒度)
+              </h3>
+              <div class="text-xs text-gray-400">
+                <i class="fa fa-refresh fa-spin mr-1"></i>
+                实时更新中
+              </div>
+            </div>
+            <div class="h-64">
+              <canvas id="realTimeTrafficChart"></canvas>
+            </div>
+          </div>
+          
+          <!-- 带宽利用率趋势图 -->
+          <div class="bg-dark bg-opacity-50 backdrop-blur-sm rounded-lg p-4 card-border">
+            <h3 class="text-gray-200 font-medium mb-4 flex items-center">
+              <i class="fa fa-area-chart mr-2 text-secondary"></i>
+              带宽利用率趋势
+            </h3>
+            <div class="h-64">
+              <canvas id="bandwidthChart"></canvas>
+            </div>
+          </div>
+          
+          <!-- 丢包率与错误率双轴图 -->
+          <div class="bg-dark bg-opacity-50 backdrop-blur-sm rounded-lg p-4 card-border">
+            <h3 class="text-gray-200 font-medium mb-4 flex items-center">
+              <i class="fa fa-area-chart mr-2 text-secondary"></i>
+              丢包率与错误率
+            </h3>
+            <div class="h-64">
+              <canvas id="errorRateChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 下部详细数据区 -->
+      <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- 左侧表格：设备流量TOP10排名 -->
+        <div class="bg-dark bg-opacity-50 backdrop-blur-sm rounded-lg p-4 card-border">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-gray-200 font-medium flex items-center">
+              <i class="fa fa-trophy mr-2 text-secondary"></i>
+              设备流量TOP10排名
+            </h3>
+            <button class="text-xs text-secondary hover:text-accent transition-colors duration-200">
+              查看全部
+            </button>
+          </div>
+          <div class="overflow-x-auto scrollbar-thin">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-gray-700">
+                  <th class="text-left py-2 px-3 text-gray-400 font-medium">序号</th>
+                  <th class="text-left py-2 px-3 text-gray-400 font-medium">设备名称</th>
+                  <th class="text-left py-2 px-3 text-gray-400 font-medium">IP地址</th>
+                  <th class="text-left py-2 px-3 text-gray-400 font-medium">流量(MB)</th>
+                  <th class="text-left py-2 px-3 text-gray-400 font-medium">占比</th>
+                  <th class="text-left py-2 px-3 text-gray-400 font-medium">状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="border-b border-gray-800 hover:bg-gray-800 hover:bg-opacity-30 transition-colors duration-200">
+                  <td class="py-2 px-3">1</td>
+                  <td class="py-2 px-3">核心交换机</td>
+                  <td class="py-2 px-3">192.168.1.1</td>
+                  <td class="py-2 px-3 font-medium">1250</td>
+                  <td class="py-2 px-3">18%</td>
+                  <td class="py-2 px-3"><span class="inline-block w-2 h-2 rounded-full bg-success mr-1"></span>正常</td>
+                </tr>
+                <tr class="border-b border-gray-800 hover:bg-gray-800 hover:bg-opacity-30 transition-colors duration-200">
+                  <td class="py-2 px-3">2</td>
+                  <td class="py-2 px-3">防火墙</td>
+                  <td class="py-2 px-3">192.168.1.2</td>
+                  <td class="py-2 px-3 font-medium">980</td>
+                  <td class="py-2 px-3">14%</td>
+                  <td class="py-2 px-3"><span class="inline-block w-2 h-2 rounded-full bg-success mr-1"></span>正常</td>
+                </tr>
+                <tr class="border-b border-gray-800 hover:bg-gray-800 hover:bg-opacity-30 transition-colors duration-200">
+                  <td class="py-2 px-3">3</td>
+                  <td class="py-2 px-3">Web服务器</td>
+                  <td class="py-2 px-3">192.168.1.10</td>
+                  <td class="py-2 px-3 font-medium">850</td>
+                  <td class="py-2 px-3">12%</td>
+                  <td class="py-2 px-3"><span class="inline-block w-2 h-2 rounded-full bg-success mr-1"></span>正常</td>
+                </tr>
+                <tr class="border-b border-gray-800 hover:bg-gray-800 hover:bg-opacity-30 transition-colors duration-200">
+                  <td class="py-2 px-3">4</td>
+                  <td class="py-2 px-3">数据库服务器</td>
+                  <td class="py-2 px-3">192.168.1.11</td>
+                  <td class="py-2 px-3 font-medium">720</td>
+                  <td class="py-2 px-3">10%</td>
+                  <td class="py-2 px-3"><span class="inline-block w-2 h-2 rounded-full bg-warning mr-1"></span>注意</td>
+                </tr>
+                <tr class="border-b border-gray-800 hover:bg-gray-800 hover:bg-opacity-30 transition-colors duration-200">
+                  <td class="py-2 px-3">5</td>
+                  <td class="py-2 px-3">路由器</td>
+                  <td class="py-2 px-3">192.168.1.254</td>
+                  <td class="py-2 px-3 font-medium">650</td>
+                  <td class="py-2 px-3">9%</td>
+                  <td class="py-2 px-3"><span class="inline-block w-2 h-2 rounded-full bg-success mr-1"></span>正常</td>
+                </tr>
+                <tr class="border-b border-gray-800 hover:bg-gray-800 hover:bg-opacity-30 transition-colors duration-200">
+                  <td class="py-2 px-3">6</td>
+                  <td class="py-2 px-3">接入交换机</td>
+                  <td class="py-2 px-3">192.168.1.3</td>
+                  <td class="py-2 px-3 font-medium">580</td>
+                  <td class="py-2 px-3">8%</td>
+                  <td class="py-2 px-3"><span class="inline-block w-2 h-2 rounded-full bg-success mr-1"></span>正常</td>
+                </tr>
+                <tr class="border-b border-gray-800 hover:bg-gray-800 hover:bg-opacity-30 transition-colors duration-200">
+                  <td class="py-2 px-3">7</td>
+                  <td class="py-2 px-3">FTP服务器</td>
+                  <td class="py-2 px-3">192.168.1.12</td>
+                  <td class="py-2 px-3 font-medium">420</td>
+                  <td class="py-2 px-3">6%</td>
+                  <td class="py-2 px-3"><span class="inline-block w-2 h-2 rounded-full bg-success mr-1"></span>正常</td>
+                </tr>
+                <tr class="border-b border-gray-800 hover:bg-gray-800 hover:bg-opacity-30 transition-colors duration-200">
+                  <td class="py-2 px-3">8</td>
+                  <td class="py-2 px-3">备份服务器</td>
+                  <td class="py-2 px-3">192.168.1.13</td>
+                  <td class="py-2 px-3 font-medium">380</td>
+                  <td class="py-2 px-3">5%</td>
+                  <td class="py-2 px-3"><span class="inline-block w-2 h-2 rounded-full bg-danger mr-1"></span>异常</td>
+                </tr>
+                <tr class="border-b border-gray-800 hover:bg-gray-800 hover:bg-opacity-30 transition-colors duration-200">
+                  <td class="py-2 px-3">9</td>
+                  <td class="py-2 px-3">监控服务器</td>
+                  <td class="py-2 px-3">192.168.1.14</td>
+                  <td class="py-2 px-3 font-medium">320</td>
+                  <td class="py-2 px-3">4%</td>
+                  <td class="py-2 px-3"><span class="inline-block w-2 h-2 rounded-full bg-success mr-1"></span>正常</td>
+                </tr>
+                <tr class="hover:bg-gray-800 hover:bg-opacity-30 transition-colors duration-200">
+                  <td class="py-2 px-3">10</td>
+                  <td class="py-2 px-3">邮件服务器</td>
+                  <td class="py-2 px-3">192.168.1.15</td>
+                  <td class="py-2 px-3 font-medium">280</td>
+                  <td class="py-2 px-3">4%</td>
+                  <td class="py-2 px-3"><span class="inline-block w-2 h-2 rounded-full bg-success mr-1"></span>正常</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <!-- 右侧图表 -->
+        <div class="space-y-6">
+          <!-- 选定设备的24小时流量趋势 -->
+          <div class="bg-dark bg-opacity-50 backdrop-blur-sm rounded-lg p-4 card-border">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-gray-200 font-medium flex items-center">
+                <i class="fa fa-clock-o mr-2 text-secondary"></i>
+                核心交换机 (192.168.1.1) 24小时流量趋势
+              </h3>
+              <select class="bg-primary border border-secondary border-opacity-50 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-accent">
+                <option value="1">核心交换机</option>
+                <option value="2">防火墙</option>
+                <option value="3">Web服务器</option>
+              </select>
+            </div>
+            <div class="h-64">
+              <canvas id="deviceTrafficTrendChart"></canvas>
+            </div>
+          </div>
+          
+          <!-- 设备接口流量分布 -->
+          <div class="bg-dark bg-opacity-50 backdrop-blur-sm rounded-lg p-4 card-border">
+            <h3 class="text-gray-200 font-medium mb-4 flex items-center">
+              <i class="fa fa-pie-chart mr-2 text-secondary"></i>
+              核心交换机接口流量分布
+            </h3>
+            <div class="h-64">
+              <canvas id="interfaceDistributionChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-dark bg-opacity-80 backdrop-blur-md border-t border-secondary border-opacity-30 mt-8">
+      <div class="container mx-auto px-4 py-4">
+        <div class="flex flex-col md:flex-row justify-between items-center">
+          <div class="text-gray-400 text-sm mb-2 md:mb-0">
+            © 2025 SNMP流量监测平台 | 版本 1.0.0
+          </div>
+          <div class="flex space-x-4">
+            <a href="#" class="text-gray-400 hover:text-accent text-sm transition-colors duration-200">帮助文档</a>
+            <a href="#" class="text-gray-400 hover:text-accent text-sm transition-colors duration-200">API接口</a>
+            <a href="#" class="text-gray-400 hover:text-accent text-sm transition-colors duration-200">关于我们</a>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- JavaScript -->
+  <script>
+    // 模拟数据
+    const mockData = {
+      // 设备状态数据
+      deviceStatus: {
+        labels: ['在线', '离线', '异常'],
+        data: [115, 10, 3],
+        colors: ['#4CAF50', '#9E9E9E', '#FF5252']
+      },
+      
+      // 协议分布数据
+      protocolDistribution: {
+        labels: ['TCP', 'UDP', 'ICMP', '其他'],
+        data: [68, 22, 6, 4],
+        colors: ['#3B82F6', '#10B981', '#F59E0B', '#6B7280']
+      },
+      
+      // 设备类型分布数据
+      deviceTypeDistribution: {
+        labels: ['交换机', '路由器', '防火墙', '服务器', '其他'],
+        data: [45, 20, 15, 35, 13],
+        colors: ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#6B7280']
+      },
+      
+      // 实时流量数据
+      realTimeTraffic: {
+        labels: ['10:00', '10:05', '10:10', '10:15', '10:20', '10:25', '10:30', '10:35', '10:40', '10:45', '10:50', '10:55'],
+        datasets: [
+          {
+            label: '流入流量 (MB)',
+            data: [120, 132, 125, 145, 158, 170, 165, 175, 180, 190, 185, 200],
+            borderColor: '#3B82F6',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            tension: 0.4,
+            fill: true
+          },
+          {
+            label: '流出流量 (MB)',
+            data: [90, 105, 110, 120, 130, 125, 135, 140, 145, 150, 155, 160],
+            borderColor: '#10B981',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            tension: 0.4,
+            fill: true
+          }
+        ]
+      },
+      
+      // 带宽利用率数据
+      bandwidthUtilization: {
+        labels: ['00:00', '02:00', '04:00', '06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00'],
+        datasets: [
+          {
+            label: '带宽利用率 (%)',
+            data: [20, 15, 12, 18, 35, 45, 52, 48, 55, 60, 50, 30],
+            borderColor: '#F59E0B',
+            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+            tension: 0.4,
+            fill: true
+          }
+        ]
+      },
+      
+      // 错误率数据
+      errorRates: {
+        labels: ['00:00', '02:00', '04:00', '06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00'],
+        datasets: [
+          {
+            label: '丢包率 (%)',
+            data: [0.5, 0.3, 0.2, 0.4, 0.8, 1.2, 0.9, 0.7, 1.5, 2.0, 1.3, 0.6],
+            borderColor: '#FF5252',
+            backgroundColor: 'rgba(255, 82, 82, 0.1)',
+            tension: 0.4,
+            fill: true,
+            yAxisID: 'y'
+          },
+          {
+            label: '错误率 (%)',
+            data: [0.2, 0.1, 0.1, 0.2, 0.3, 0.5, 0.4, 0.3, 0.6, 0.8, 0.5, 0.2],
+            borderColor: '#8B5CF6',
+            backgroundColor: 'rgba(139, 92, 246, 0.1)',
+            tension: 0.4,
+            fill: true,
+            yAxisID: 'y1'
+          }
+        ]
+      },
+      
+      // 设备24小时流量趋势
+      deviceTrafficTrend: {
+        labels: ['00:00', '02:00', '04:00', '06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00'],
+        datasets: [
+          {
+            label: '流入流量 (GB)',
+            data: [5.2, 4.8, 4.5, 5.0, 6.5, 8.2, 9.5, 9.0, 10.5, 11.2, 9.8, 7.5],
+            borderColor: '#3B82F6',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            tension: 0.4,
+            fill: true
+          },
+          {
+            label: '流出流量 (GB)',
+            data: [3.5, 3.2, 3.0, 3.8, 4.5, 5.2, 6.0, 5.8, 6.5, 7.0, 6.2, 4.8],
+            borderColor: '#10B981',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            tension: 0.4,
+            fill: true
+          }
+        ]
+      },
+      
+      // 接口流量分布
+      interfaceDistribution: {
+        labels: ['端口1', '端口2', '端口3', '端口4', '端口5', '端口6', '端口7', '端口8'],
+        datasets: [
+          {
+            label: '流量占比 (%)',
+            data: [25, 18, 15, 12, 10, 8, 6, 6],
+            backgroundColor: [
+              '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#EF4444', '#14B8A6', '#6366F1'
+            ]
+          }
+        ]
+      }
+    };
+
+    // 等待DOM加载完成
+    document.addEventListener('DOMContentLoaded', function() {
+      // 设置Chart.js全局配置
+      Chart.defaults.color = '#9CA3AF';
+      Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
+      Chart.defaults.font.family = "'Inter', 'system-ui', 'sans-serif'";
+      
+      // 创建设备状态环形图
+      const deviceStatusCtx = document.getElementById('deviceStatusChart').getContext('2d');
+      const deviceStatusChart = new Chart(deviceStatusCtx, {
+        type: 'doughnut',
+        data: {
+          labels: mockData.deviceStatus.labels,
+          datasets: [{
+            data: mockData.deviceStatus.data,
+            backgroundColor: mockData.deviceStatus.colors,
+            borderWidth: 0,
+            hoverOffset: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '70%',
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              backgroundColor: 'rgba(10, 26, 53, 0.9)',
+              titleColor: '#FFFFFF',
+              bodyColor: '#E5E7EB',
+              borderColor: 'rgba(26, 95, 239, 0.5)',
+              borderWidth: 1,
+              padding: 10,
+              displayColors: true,
+              callbacks: {
+                label: function(context) {
+                  const label = context.label || '';
+                  const value = context.raw || 0;
+                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                  const percentage = Math.round((value / total) * 100);
+                  return `${label}: ${value} (${percentage}%)`;
+                }
+              }
+            }
+          }
+        }
+      });
+      
+      // 创建协议分布饼图
+      const protocolCtx = document.getElementById('protocolChart').getContext('2d');
+      const protocolChart = new Chart(protocolCtx, {
+        type: 'pie',
+        data: {
+          labels: mockData.protocolDistribution.labels,
+          datasets: [{
+            data: mockData.protocolDistribution.data,
+            backgroundColor: mockData.protocolDistribution.colors,
+            borderWidth: 0,
+            hoverOffset: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              backgroundColor: 'rgba(10, 26, 53, 0.9)',
+              titleColor: '#FFFFFF',
+              bodyColor: '#E5E7EB',
+              borderColor: 'rgba(26, 95, 239, 0.5)',
+              borderWidth: 1,
+              padding: 10,
+              displayColors: true,
+              callbacks: {
+                label: function(context) {
+                  const label = context.label || '';
+                  const value = context.raw || 0;
+                  return `${label}: ${value}%`;
+                }
+              }
+            }
+          }
+        }
+      });
+      
+      // 创建设备类型分布条形图
+      const deviceTypeCtx = document.getElementById('deviceTypeChart').getContext('2d');
+      const deviceTypeChart = new Chart(deviceTypeCtx, {
+        type: 'bar',
+        data: {
+          labels: mockData.deviceTypeDistribution.labels,
+          datasets: [{
+            label: '设备数量',
+            data: mockData.deviceTypeDistribution.data,
+            backgroundColor: mockData.deviceTypeDistribution.colors,
+            borderWidth: 0,
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          indexAxis: 'y',
+          scales: {
+            x: {
+              grid: {
+                display: false
+              }
+            },
+            y: {
+              grid: {
+                display: false
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              backgroundColor: 'rgba(10, 26, 53, 0.9)',
+              titleColor: '#FFFFFF',
+              bodyColor: '#E5E7EB',
+              borderColor: 'rgba(26, 95, 239, 0.5)',
+              borderWidth: 1,
+              padding: 10,
+              displayColors: true
+            }
+          }
+        }
+      });
+      
+      // 创建实时流量折线图
+      const realTimeTrafficCtx = document.getElementById('realTimeTrafficChart').getContext('2d');
+      const realTimeTrafficChart = new Chart(realTimeTrafficCtx, {
+        type: 'line',
+        data: {
+          labels: mockData.realTimeTraffic.labels,
+          datasets: mockData.realTimeTraffic.datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              grid: {
+                color: 'rgba(255, 255, 255, 0.05)'
+              }
+            },
+            y: {
+              grid: {
+                color: 'rgba(255, 255, 255, 0.05)'
+              },
+              beginAtZero: true
+            }
+          },
+          interaction: {
+            mode: 'index',
+            intersect: false
+          },
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: {
+                usePointStyle: true,
+                boxWidth: 6
+              }
+            },
+            tooltip: {
+              backgroundColor: 'rgba(10, 26, 53, 0.9)',
+              titleColor: '#FFFFFF',
+              bodyColor: '#E5E7EB',
+              borderColor: 'rgba(26, 95, 239, 0.5)',
+              borderWidth: 1,
+              padding: 10,
+              displayColors: true
+            }
+          }
+        }
+      });
+      
+      // 创建带宽利用率趋势图
+      const bandwidthCtx = document.getElementById('bandwidthChart').getContext('2d');
+      const bandwidthChart = new Chart(bandwidthCtx, {
+        type: 'line',
+        data: {
+          labels: mockData.bandwidthUtilization.labels,
+          datasets: mockData.bandwidthUtilization.datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              grid: {
+                color: 'rgba(255, 255, 255, 0.05)'
+              }
+            },
+            y: {
+              grid: {
+                color: 'rgba(255, 255, 255, 0.05)'
+              },
+              beginAtZero: true,
+              max: 100
+            }
+          },
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: {
+                usePointStyle: true,
+                boxWidth: 6
+              }
+            },
+            tooltip: {
+              backgroundColor: 'rgba(10, 26, 53, 0.9)',
+              titleColor: '#FFFFFF',
+              bodyColor: '#E5E7EB',
+              borderColor: 'rgba(26, 95, 239, 0.5)',
+              borderWidth: 1,
+              padding: 10,
+              displayColors: true
+            }
+          }
+        }
+      });
+      
+      // 创建丢包率与错误率双轴图
+      const errorRateCtx = document.getElementById('errorRateChart').getContext('2d');
+      const errorRateChart = new Chart(errorRateCtx, {
+        type: 'line',
+        data: {
+          labels: mockData.errorRates.labels,
+          datasets: mockData.errorRates.datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              grid: {
+                color: 'rgba(255, 255, 255, 0.05)'
+              }
+            },
+            y: {
+              type: 'linear',
+              display: true,
+              position: 'left',
+              grid: {
+                color: 'rgba(255, 255, 255, 0.05)'
+              },
+              title: {
+                display: true,
+                text: '丢包率 (%)'
+              }
+            },
+            y1: {
+              type: 'linear',
+              display: true,
+              position: 'right',
+              grid: {
+                drawOnChartArea: false
+              },
+              title: {
+                display: true,
+                text: '错误率 (%)'
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: {
+                usePointStyle: true,
+                boxWidth: 6
+              }
+            },
+            tooltip: {
+              backgroundColor: 'rgba(10, 26, 53, 0.9)',
+              titleColor: '#FFFFFF',
+              bodyColor: '#E5E7EB',
+              borderColor: 'rgba(26, 95, 239, 0.5)',
+              borderWidth: 1,
+              padding: 10,
+              displayColors: true
+            }
+          }
+        }
+      });
+      
+      // 创建设备24小时流量趋势图
+      const deviceTrafficTrendCtx = document.getElementById('deviceTrafficTrendChart').getContext('2d');
+      const deviceTrafficTrendChart = new Chart(deviceTrafficTrendCtx, {
+        type: 'line',
+        data: {
+          labels: mockData.deviceTrafficTrend.labels,
+          datasets: mockData.deviceTrafficTrend.datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              grid: {
+                color: 'rgba(255, 255, 255, 0.05)'
+              }
+            },
+            y: {
+              grid: {
+                color: 'rgba(255, 255, 255, 0.05)'
+              },
+              beginAtZero: true
+            }
+          },
+          interaction: {
+            mode: 'index',
+            intersect: false
+          },
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: {
+                usePointStyle: true,
+                boxWidth: 6
+              }
+            },
+            tooltip: {
+              backgroundColor: 'rgba(10, 26, 53, 0.9)',
+              titleColor: '#FFFFFF',
+              bodyColor: '#E5E7EB',
+              borderColor: 'rgba(26, 95, 239, 0.5)',
+              borderWidth: 1,
+              padding: 10,
+              displayColors: true
+            }
+          }
+        }
+      });
+      
+      // 创建接口流量分布图
+      const interfaceDistributionCtx = document.getElementById('interfaceDistributionChart').getContext('2d');
+      const interfaceDistributionChart = new Chart(interfaceDistributionCtx, {
+        type: 'bar',
+        data: {
+          labels: mockData.interfaceDistribution.labels,
+          datasets: mockData.interfaceDistribution.datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              grid: {
+                display: false
+              }
+            },
+            y: {
+              grid: {
+                color: 'rgba(255, 255, 255, 0.05)'
+              },
+              beginAtZero: true,
+              max: 100
+            }
+          },
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              backgroundColor: 'rgba(10, 26, 53, 0.9)',
+              titleColor: '#FFFFFF',
+              bodyColor: '#E5E7EB',
+              borderColor: 'rgba(26, 95, 239, 0.5)',
+              borderWidth: 1,
+              padding: 10,
+              displayColors: true
+            }
+          }
+        }
+      });
+      
+      // 模拟实时数据更新
+      setInterval(() => {
+        // 更新实时流量数据
+        mockData.realTimeTraffic.datasets[0].data.shift();
+        mockData.realTimeTraffic.datasets[1].data.shift();
+        
+        // 生成随机新数据
+        const newInTraffic = Math.floor(Math.random() * 50) + 150;
+        const newOutTraffic = Math.floor(Math.random() * 40) + 120;
+        
+        mockData.realTimeTraffic.datasets[0].data.push(newInTraffic);
+        mockData.realTimeTraffic.datasets[1].data.push(newOutTraffic);
+        
+        // 更新图表
+        realTimeTrafficChart.update();
+      }, 5000);
+      
+      // 添加交互功能
+      document.querySelectorAll('select, input').forEach(element => {
+        element.addEventListener('change', function() {
+          // 模拟数据筛选效果
+          const randomDelay = Math.floor(Math.random() * 500) + 300;
+          
+          // 显示加载状态
+          document.querySelectorAll('.card-border').forEach(card => {
+            card.classList.add('opacity-50');
+          });
+          
+          setTimeout(() => {
+            // 恢复正常状态
+            document.querySelectorAll('.card-border').forEach(card => {
+              card.classList.remove('opacity-50');
+            });
+            
+            // 随机更新一些数据点以模拟筛选效果
+            const charts = [
+              deviceStatusChart, protocolChart, deviceTypeChart,
+              realTimeTrafficChart, bandwidthChart, errorRateChart,
+              deviceTrafficTrendChart, interfaceDistributionChart
+            ];
+            
+            charts.forEach(chart => {
+              chart.data.datasets.forEach(dataset => {
+                dataset.data = dataset.data.map(value => {
+                  const change = Math.random() * 0.2 - 0.1; // -10% 到 +10% 的随机变化
+                  return Math.max(0, Math.round(value * (1 + change)));
+                });
+              });
+              chart.update();
+            });
+          }, randomDelay);
+        });
+      });
+      
+      // 刷新数据按钮点击事件
+      document.querySelector('button:has(.fa-refresh)').addEventListener('click', function() {
+        // 添加旋转动画
+        const icon = this.querySelector('.fa-refresh');
+        icon.classList.add('fa-spin');
+        
+        // 模拟数据刷新
+        setTimeout(() => {
+          // 移除旋转动画
+          icon.classList.remove('fa-spin');
+          
+          // 随机更新一些数据点以模拟刷新效果
+          const charts = [
+            deviceStatusChart, protocolChart, deviceTypeChart,
+            realTimeTrafficChart, bandwidthChart, errorRateChart,
+            deviceTrafficTrendChart, interfaceDistributionChart
+          ];
+          
+          charts.forEach(chart => {
+            chart.data.datasets.forEach(dataset => {
+              dataset.data = dataset.data.map(value => {
+                const change = Math.random() * 0.1 - 0.05; // -5% 到 +5% 的随机变化
+                return Math.max(0, Math.round(value * (1 + change)));
+              });
+            });
+            chart.update();
+          });
+          
+          // 显示刷新成功提示
+          alert('数据已成功刷新！');
+        }, 1000);
+      });
+    });
+  </script>
+</body>
+</html>
